@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR CTV · SBT Digital</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.9.2/lib/qr-code-styling.js"></script>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#fff; --ink:#14171f; --muted:#5e6573; --line:#e3e6eb; --soft:#eef1f5;
+  --accent:#1f5eff; --accent-ink:#fff; --accent-soft:#e6edff; --good:#0f8a5f; --warn:#b25e00; --bad:#c62f2f;
+  --r:10px; --shadow:0 1px 2px rgba(20,23,31,.06),0 4px 16px rgba(20,23,31,.04);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e1015; --panel:#161920; --ink:#e9ecf2; --muted:#98a0ae; --line:#262a33; --soft:#1d2129;
+  --accent:#5b8bff; --accent-ink:#0b0d12; --accent-soft:#1b2540; --shadow:none;}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Inter Tight",system-ui,sans-serif}
+a{color:var(--accent)}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
+.hidden{display:none!important}
+button,.btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  padding:8px 14px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap}
+button:hover{border-color:var(--muted)}
+.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.primary:hover{filter:brightness(1.08);border-color:var(--accent)}
+.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.danger{color:var(--bad)}
+.sm{padding:5px 10px;font-size:13px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:0 0 4px}
+.field{margin-bottom:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>*{flex:1 1 160px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px}
+h1,h2,h3{margin:0;line-height:1.2}
+h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:16px;font-weight:600}
+h3{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.muted{color:var(--muted)}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--muted)}
+.tag.on{background:#e3f6ee;color:var(--good)}
+@media (prefers-color-scheme:dark){.tag.on{background:#12291f}}
+
+/* Layout */
+.top{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700}
+.brand .dot{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-size:12px}
+.top .sp{flex:1}
+.shell{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 55px)}
+.side{border-right:1px solid var(--line);background:var(--panel);padding:16px;overflow:auto}
+.main{padding:22px;min-width:0}
+.camp{padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:4px}
+.camp:hover{background:var(--soft)}
+.camp.sel{background:var(--accent-soft)}
+.camp b{display:block;font-weight:600}
+.camp small{color:var(--muted)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0 18px}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--muted);padding:10px 12px}
+.tabs button.on{color:var(--ink);border-color:var(--accent);font-weight:600}
+@media (max-width:860px){.shell{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid var(--line);max-height:220px}.main{padding:16px}}
+
+/* Dashboard */
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:16px}
+.filters .field{margin:0;flex:1 1 150px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi .v{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12.5px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px}
+.chartbox{position:relative;height:280px;margin-top:12px}
+.chartbox.tall{height:320px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+td.n,th.n{text-align:right}
+.bar{height:6px;background:var(--soft);border-radius:4px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.heat{display:grid;grid-template-columns:34px repeat(24,1fr);gap:2px;margin-top:12px;font-size:10.5px;color:var(--muted)}
+.heat div{aspect-ratio:1;border-radius:3px;min-width:0}
+.heat .lab{aspect-ratio:auto;display:flex;align-items:center}
+.heat .hl{aspect-ratio:auto;text-align:center}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+
+/* QR */
+.pieces{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.piece .qr{background:#fff;border-radius:8px;display:grid;place-items:center;padding:10px;margin:12px 0;border:1px solid var(--line)}
+.piece .qr canvas,.piece .qr svg{max-width:100%;height:auto}
+.piece .url{word-break:break-all;font-size:12px;color:var(--muted)}
+.piece .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(10,12,16,.55);display:grid;place-items:center;z-index:20;padding:16px}
+.modal .card{width:min(760px,100%);max-height:92vh;overflow:auto}
+.modal-grid{display:grid;grid-template-columns:1fr 240px;gap:18px}
+@media (max-width:700px){.modal-grid{grid-template-columns:1fr}}
+.preview{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;place-items:center}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:30;font-size:14px}
+.login{max-width:380px;margin:12vh auto;padding:0 16px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);font-weight:500}
+.check input{width:auto}
+.report-head{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.wrap{max-width:1200px;margin:0 auto;padding:22px}
+</style>
+</head>
+<body>
+
+<!-- ============ CONFIGURAÇÃO ============ -->
+<script>
+const CONFIG = {
+  SUPABASE_URL: "https://kdpyxuvsjtixrbhqfbhu.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_WAeQG0hz7mspDGju0VfDaQ_QyJA4Odm",
+  // Base do link que vai dentro do QR. Padrão: a Edge Function "r".
+  // Se criar um domínio curto (ex.: https://qr.sbt.com.br/), troque aqui.
+  REDIRECT_BASE: null
+};
+CONFIG.REDIRECT_BASE = CONFIG.REDIRECT_BASE || (CONFIG.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/r/");
+</script>
+
+<!-- ============ LOGIN ============ -->
+<section id="v-login" class="hidden">
+  <div class="login">
+    <div class="brand" style="margin-bottom:22px"><span class="dot">QR</span> QR CTV · SBT Digital</div>
+    <div class="card">
+      <h1 style="margin-bottom:6px">Entrar</h1>
+      <p class="muted" style="margin:0 0 16px">Acesso restrito ao time Digital.</p>
+      <form id="f-login">
+        <div class="field"><label>E-mail</label><input type="email" id="l-email" required autocomplete="email"></div>
+        <div class="field"><label>Senha</label><input type="password" id="l-pass" autocomplete="current-password" placeholder="Deixe vazio para receber link por e-mail"></div>
+        <button class="primary" style="width:100%;justify-content:center">Entrar</button>
+      </form>
+      <p id="l-msg" class="hint"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP (time) ============ -->
+<section id="v-app" class="hidden">
+  <header class="top">
+    <div class="brand"><span class="dot">QR</span> QR CTV <span class="muted" style="font-weight:500">· SBT Digital</span></div>
+    <div class="sp"></div>
+    <span id="who" class="muted" style="font-size:13px"></span>
+    <button class="ghost sm" id="b-logout">Sair</button>
+  </header>
+  <div class="shell">
+    <aside class="side">
+      <button class="primary" id="b-newcamp" style="width:100%;justify-content:center;margin-bottom:14px">+ Nova campanha</button>
+      <label class="check" style="margin-bottom:10px"><input type="checkbox" id="c-showarch"> Mostrar arquivadas</label>
+      <input id="c-search" placeholder="Buscar campanha ou anunciante" style="margin-bottom:10px">
+      <div id="camp-list"></div>
+    </aside>
+    <main class="main">
+      <div id="no-camp" class="empty">Crie ou selecione uma campanha para começar.</div>
+      <div id="camp-view" class="hidden">
+        <div class="report-head" style="margin:0">
+          <div>
+            <h1 id="cv-name"></h1>
+            <div class="muted" id="cv-meta" style="margin-top:4px"></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="sm" id="b-copyshare">Copiar link do cliente</button>
+          </div>
+        </div>
+        <div class="tabs">
+          <button data-tab="dash" class="on">Métricas</button>
+          <button data-tab="qr">QR Codes</button>
+          <button data-tab="cfg">Campanha</button>
+        </div>
+        <div id="tab-dash"></div>
+        <div id="tab-qr" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+            <p class="muted" style="margin:0">Um QR por peça (formato, canal ou parceiro de CTV). Os scans de cada QR são medidos separadamente.</p>
+            <button class="primary" id="b-newpiece">+ Novo QR Code</button>
+          </div>
+          <div id="pieces" class="pieces"></div>
+        </div>
+        <div id="tab-cfg" class="hidden">
+          <div class="card" style="max-width:720px">
+            <form id="f-camp-edit"></form>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ RELATÓRIO DO CLIENTE ============ -->
+<section id="v-report" class="hidden">
+  <header class="top">
+    <div class="brand"><span class="dot">QR</span> Relatório de QR Code · CTV SBT</div>
+  </header>
+  <div class="wrap">
+    <div class="report-head">
+      <div><h1 id="rp-name"></h1><div class="muted" id="rp-meta" style="margin-top:4px"></div></div>
+    </div>
+    <div id="rp-dash"></div>
+  </div>
+</section>
+
+<div id="modal-root"></div>
+
+<script>
+// =====================================================================
+// Utilidades
+// =====================================================================
+const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n) => (n ?? 0).toLocaleString("pt-BR");
+const pct = (n, d = 2) => (n == null || !isFinite(n)) ? "—" : (n * 100).toLocaleString("pt-BR", {maximumFractionDigits: d}) + "%";
+const fmtDate = (d) => d ? new Date(d + (d.length === 10 ? "T12:00:00" : "")).toLocaleDateString("pt-BR") : "";
+const toast = (m) => { const t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); };
+const show = (id) => ["v-login","v-app","v-report"].forEach(v => $("#" + v).classList.toggle("hidden", v !== id));
+const slugGen = () => { const a = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; const r = crypto.getRandomValues(new Uint8Array(6)); r.forEach(b => s += a[b % a.length]); return s; };
+const qrUrl = (slug) => CONFIG.REDIRECT_BASE + slug;
+// Inputs datetime-local são interpretados em horário de Brasília (UTC-3)
+const brToIso = (v) => v ? new Date(v + ":00-03:00").toISOString() : null;
+const brNowInput = (offsetDays = 0) => { const d = new Date(Date.now() - 3 * 3600e3 + offsetDays * 864e5); return d.toISOString().slice(0, 16); };
+const dateToInput = (d, end = false) => d ? `${d}T${end ? "23:59" : "00:00"}` : "";
+function copy(text, msg = "Copiado") { navigator.clipboard.writeText(text).then(() => toast(msg), () => prompt("Copie:", text)); }
+function download(name, blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// =====================================================================
+// QR Code
+// =====================================================================
+function makeQR(data, style = {}, size = 300) {
+  const hasLogo = !!style.logo;
+  return new QRCodeStyling({
+    width: size, height: size, type: "canvas", data,
+    margin: style.margin ?? 16,
+    qrOptions: { errorCorrectionLevel: hasLogo ? "H" : (style.ec || "M") },
+    dotsOptions: { color: style.fg || "#000000", type: style.dots || "square" },
+    cornersSquareOptions: { color: style.corner || style.fg || "#000000", type: style.cornerType || "square" },
+    cornersDotOptions: { color: style.corner || style.fg || "#000000" },
+    backgroundOptions: { color: style.bg || "#ffffff" },
+    image: style.logo || undefined,
+    imageOptions: { crossOrigin: "anonymous", margin: 6, imageSize: 0.3, hideBackgroundDots: true }
+  });
+}
+function contrastRatio(a, b) {
+  const lum = (h) => { const c = h.replace("#",""); const v = [0,2,4].map(i => parseInt(c.substr(i,2),16)/255).map(x => x <= .03928 ? x/12.92 : Math.pow((x+.055)/1.055, 2.4)); return .2126*v[0]+.7152*v[1]+.0722*v[2]; };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + .05) / (y + .05);
+}
+
+// =====================================================================
+// Dashboard (compartilhado entre time e cliente)
+// =====================================================================
+const charts = {};
+function destroyCharts(prefix) { Object.keys(charts).filter(k => k.startsWith(prefix)).forEach(k => { charts[k].destroy(); delete charts[k]; }); }
+
+function dashSkeleton(root, { admin, pieces, start, end }) {
+  const from = dateToInput(start) || brNowInput(-7), to = dateToInput(end, true) || brNowInput(0);
+  root.innerHTML = `
+  <div class="filters">
+    <div class="field"><label>QR / peça</label><select data-f="piece"><option value="">Todas as peças</option>
+      ${pieces.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>
+    <div class="field"><label>De (Brasília)</label><input type="datetime-local" data-f="from" value="${from}"></div>
+    <div class="field"><label>Até (Brasília)</label><input type="datetime-local" data-f="to" value="${to}"></div>
+    <div class="field" style="flex:0 1 130px"><label>Agrupar por</label><select data-f="bucket">
+      <option value="minute">Minuto</option><option value="hour" selected>Hora</option><option value="day">Dia</option></select></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;flex:0 0 auto">
+      <button class="sm" data-quick="1">24h</button><button class="sm" data-quick="7">7d</button><button class="sm" data-quick="camp">Campanha</button>
+      <button class="primary sm" data-act="apply">Atualizar</button>
+      ${admin ? `<button class="sm" data-act="csv">CSV</button>` : ""}
+    </div>
+  </div>
+  <div data-out></div>`;
+  $$("[data-quick]", root).forEach(b => b.onclick = () => {
+    const q = b.dataset.quick;
+    if (q === "camp") { $("[data-f=from]", root).value = dateToInput(start) || ""; $("[data-f=to]", root).value = dateToInput(end, true) || ""; }
+    else { $("[data-f=from]", root).value = brNowInput(-Number(q)); $("[data-f=to]", root).value = brNowInput(0); }
+    $("[data-f=bucket]", root).value = q === "1" ? "hour" : (q === "7" ? "hour" : "day");
+    $("[data-act=apply]", root).click();
+  });
+}
+
+function readFilters(root) {
+  return {
+    piece: $("[data-f=piece]", root).value || null,
+    from: brToIso($("[data-f=from]", root).value),
+    to: brToIso($("[data-f=to]", root).value),
+    bucket: $("[data-f=bucket]", root).value
+  };
+}
+
+function fillTimeline(rows, bucket) {
+  if (!rows.length) return [];
+  const step = { minute: 60e3, hour: 3600e3, day: 864e5 }[bucket];
+  const map = new Map(rows.map(r => [r.t.slice(0, 16), r]));
+  const start = new Date(rows[0].t.slice(0, 16) + "Z").getTime(), end = new Date(rows.at(-1).t.slice(0, 16) + "Z").getTime();
+  if ((end - start) / step > 6000) return rows;
+  const out = [];
+  for (let t = start; t <= end; t += step) {
+    const k = new Date(t).toISOString().slice(0, 16);
+    out.push(map.get(k) || { t: k, scans: 0, uniques: 0 });
+  }
+  return out;
+}
+function labelFor(t, bucket) {
+  const [d, h] = t.slice(0, 16).split("T"); const [y, m, dd] = d.split("-");
+  return bucket === "day" ? `${dd}/${m}` : `${dd}/${m} ${h}`;
+}
+
+function renderStats(root, st, bucket, prefix) {
+  const out = $("[data-out]", root);
+  destroyCharts(prefix);
+  const T = st.totals;
+  if (!T.scans) { out.innerHTML = `<div class="card empty">Nenhum scan no período e filtro selecionados.</div>`; return; }
+  const rate = T.impressions ? T.scans / T.impressions : null;
+  const topPiece = st.by_piece[0];
+  out.innerHTML = `
+  <div class="kpis">
+    <div class="card kpi"><h3>Scans</h3><div class="v">${fmt(T.scans)}</div><div class="s">leituras válidas (sem robôs)</div></div>
+    <div class="card kpi"><h3>Únicos</h3><div class="v">${fmt(T.uniques)}</div><div class="s">${(T.scans / T.uniques).toLocaleString("pt-BR",{maximumFractionDigits:2})} scans por pessoa</div></div>
+    <div class="card kpi"><h3>Taxa de scan</h3><div class="v">${rate == null ? "—" : pct(rate, 3)}</div><div class="s">${T.impressions ? "sobre " + fmt(T.impressions) + " impressões" : "informe impressões nas peças"}</div></div>
+    <div class="card kpi"><h3>Peça destaque</h3><div class="v" style="font-size:18px;line-height:1.25;margin-top:10px">${esc(topPiece?.name || "—")}</div><div class="s">${fmt(topPiece?.scans)} scans</div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px"><h2>Curva de scans</h2><p class="muted" style="margin:4px 0 0;font-size:13px">Horário de Brasília. Use agrupamento por minuto para ver o pico logo após a exibição da peça.</p>
+    <div class="chartbox tall"><canvas data-c="timeline"></canvas></div></div>
+  <div class="grid2">
+    <div class="card"><h2>Por peça</h2>
+      <table><thead><tr><th>Peça</th><th class="n">Scans</th><th class="n">Únicos</th><th class="n">Taxa</th></tr></thead><tbody>
+      ${st.by_piece.map(p => `<tr><td>${esc(p.name)}<div class="bar"><i style="width:${T.scans ? (p.scans / T.scans * 100) : 0}%"></i></div></td>
+        <td class="n">${fmt(p.scans)}</td><td class="n">${fmt(p.uniques)}</td><td class="n">${p.impressions ? pct(p.scans / p.impressions, 3) : "—"}</td></tr>`).join("")}
+      </tbody></table></div>
+    <div class="card"><h2>Dia da semana × hora</h2><div data-heat></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Sistema operacional</h2><div class="chartbox"><canvas data-c="os"></canvas></div></div>
+    <div class="card"><h2>Dispositivo</h2><div class="chartbox"><canvas data-c="device"></canvas></div></div>
+    <div class="card"><h2>Navegador / app de leitura</h2><div class="chartbox"><canvas data-c="browser"></canvas></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Estados</h2><div class="chartbox tall"><canvas data-c="region"></canvas></div></div>
+    <div class="card"><h2>Cidades (top 25)</h2>
+      <table><thead><tr><th>Cidade</th><th>UF</th><th class="n">Scans</th><th class="n">%</th></tr></thead><tbody>
+      ${st.by_city.map(c => `<tr><td>${esc(c.k)}</td><td class="muted">${esc(c.r || "")}</td><td class="n">${fmt(c.n)}</td><td class="n">${pct(c.n / T.scans, 1)}</td></tr>`).join("")}
+      </tbody></table></div>
+  </div>`;
+
+  const accent = cssVar("--accent"), muted = cssVar("--muted"), line = cssVar("--line");
+  Chart.defaults.font.family = '"Inter Tight", system-ui, sans-serif';
+  Chart.defaults.color = muted;
+  const grid = { color: line };
+  const tl = fillTimeline(st.timeline, bucket);
+  charts[prefix + "tl"] = new Chart($("[data-c=timeline]", out), {
+    type: bucket === "day" ? "bar" : "line",
+    data: { labels: tl.map(r => labelFor(r.t, bucket)), datasets: [
+      { label: "Scans", data: tl.map(r => r.scans), borderColor: accent, backgroundColor: accent + "33", fill: true, tension: .25, pointRadius: tl.length > 80 ? 0 : 2, borderWidth: 2 },
+      { label: "Únicos", data: tl.map(r => r.uniques), borderColor: muted, backgroundColor: "transparent", borderDash: [4, 4], pointRadius: 0, borderWidth: 1.5 }
+    ]},
+    options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 12, autoSkip: true } }, y: { beginAtZero: true, grid, ticks: { precision: 0 } } },
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } } }
+  });
+  const hbar = (key, rows, limit = 10) => {
+    const r = rows.slice(0, limit);
+    charts[prefix + key] = new Chart($(`[data-c=${key}]`, out), {
+      type: "bar", data: { labels: r.map(x => x.k), datasets: [{ data: r.map(x => x.n), backgroundColor: accent, borderRadius: 4, barThickness: 16 }] },
+      options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `${fmt(c.raw)} scans (${pct(c.raw / T.scans, 1)})` } } },
+        scales: { x: { beginAtZero: true, grid, ticks: { precision: 0 } }, y: { grid: { display: false } } } }
+    });
+  };
+  hbar("os", st.by_os); hbar("device", st.by_device); hbar("browser", st.by_browser); hbar("region", st.by_region, 27);
+
+  // Heatmap
+  const days = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const hm = {}; let max = 0; st.by_weekday_hour.forEach(c => { hm[c.d + "-" + c.h] = c.n; max = Math.max(max, c.n); });
+  let html = `<div class="heat"><div class="lab"></div>${Array.from({length: 24}, (_, h) => `<div class="hl">${h % 3 === 0 ? h : ""}</div>`).join("")}`;
+  days.forEach((d, i) => {
+    html += `<div class="lab">${d}</div>`;
+    for (let h = 0; h < 24; h++) {
+      const n = hm[(i + 1) + "-" + h] || 0; const a = max ? n / max : 0;
+      html += `<div title="${d} ${h}h: ${fmt(n)} scans" style="background:${n ? `color-mix(in srgb, ${accent} ${Math.round(12 + a * 88)}%, transparent)` : cssVar("--soft")}"></div>`;
+    }
+  });
+  $("[data-heat]", out).innerHTML = html + "</div>";
+}
+
+// =====================================================================
+// MODO CLIENTE (?r=token)
+// =====================================================================
+async function initReport(token) {
+  show("v-report");
+  const root = $("#rp-dash");
+  const call = (f) => sb.rpc("campaign_stats", { p_token: token, p_from: f?.from ?? null, p_to: f?.to ?? null, p_piece: f?.piece ?? null, p_bucket: f?.bucket ?? "day" });
+  const first = await call(null);
+  if (first.error) { root.innerHTML = `<div class="card empty">Este link de relatório é inválido ou foi desativado.</div>`; return; }
+  const c = first.data.campaign;
+  document.title = `${c.name} · Relatório QR CTV`;
+  $("#rp-name").textContent = c.name;
+  $("#rp-meta").textContent = [c.advertiser, c.agency, c.start_date && `${fmtDate(c.start_date)} – ${fmtDate(c.end_date)}`].filter(Boolean).join(" · ");
+  dashSkeleton(root, { admin: false, pieces: first.data.by_piece, start: c.start_date, end: c.end_date });
+  const run = async () => {
+    const f = readFilters(root);
+    const { data, error } = await call(f);
+    if (error) return toast(error.message);
+    renderStats(root, data, f.bucket, "rp-");
+  };
+  $("[data-act=apply]", root).onclick = run;
+  run();
+}
+
+// =====================================================================
+// MODO TIME
+// =====================================================================
+const S = { user: null, campaigns: [], current: null, pieces: [] };
+
+async function initApp() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return showLogin();
+  S.user = session.user;
+  const { data: me } = await sb.from("team_members").select("email").limit(1);
+  if (!me || !me.length) {
+    show("v-login");
+    $("#l-msg").innerHTML = `O e-mail <b>${esc(S.user.email)}</b> ainda não foi liberado. Peça para incluírem em <span class="mono">team_members</span>. <a href="#" id="l-out">Sair</a>`;
+    $("#l-out").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+    return;
+  }
+  show("v-app");
+  $("#who").textContent = S.user.email;
+  await loadCampaigns();
+  const last = localStorageGet("qrctv:camp");
+  if (last && S.campaigns.find(c => c.id === last)) selectCampaign(last);
+}
+function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+function showLogin() {
+  show("v-login");
+  $("#f-login").onsubmit = async (e) => {
+    e.preventDefault();
+    const email = $("#l-email").value.trim(), password = $("#l-pass").value;
+    $("#l-msg").textContent = "Aguarde…";
+    if (password) {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) return $("#l-msg").textContent = "E-mail ou senha incorretos.";
+      initApp();
+    } else {
+      const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+      $("#l-msg").textContent = error ? error.message : "Enviamos um link de acesso para o seu e-mail.";
+    }
+  };
+}
+
+async function loadCampaigns() {
+  const { data, error } = await sb.from("campaigns").select("*").order("created_at", { ascending: false });
+  if (error) return toast(error.message);
+  S.campaigns = data;
+  renderCampList();
+}
+function renderCampList() {
+  const q = $("#c-search").value.toLowerCase(), arch = $("#c-showarch").checked;
+  const list = S.campaigns.filter(c => (arch || !c.archived) && (!q || (c.name + " " + (c.advertiser || "")).toLowerCase().includes(q)));
+  $("#camp-list").innerHTML = list.length ? list.map(c => `
+    <div class="camp ${S.current?.id === c.id ? "sel" : ""}" data-id="${c.id}">
+      <b>${esc(c.name)}</b><small>${esc(c.advertiser || "—")}${c.start_date ? " · " + fmtDate(c.start_date) : ""}${c.archived ? " · arquivada" : ""}</small>
+    </div>`).join("") : `<p class="muted" style="font-size:14px">Nenhuma campanha.</p>`;
+  $$(".camp").forEach(el => el.onclick = () => selectCampaign(el.dataset.id));
+}
+$("#c-search").oninput = renderCampList;
+$("#c-showarch").onchange = renderCampList;
+
+async function selectCampaign(id) {
+  S.current = S.campaigns.find(c => c.id === id);
+  localStorageSet("qrctv:camp", id);
+  renderCampList();
+  $("#no-camp").classList.add("hidden"); $("#camp-view").classList.remove("hidden");
+  const c = S.current;
+  $("#cv-name").textContent = c.name;
+  $("#cv-meta").textContent = [c.advertiser, c.agency, c.start_date && `${fmtDate(c.start_date)} – ${fmtDate(c.end_date)}`].filter(Boolean).join(" · ") || "Sem dados de anunciante";
+  await loadPieces();
+  setTab(localStorageGet("qrctv:tab") || "dash");
+}
+
+function setTab(t) {
+  localStorageSet("qrctv:tab", t);
+  $$(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  ["dash","qr","cfg"].forEach(x => $("#tab-" + x).classList.toggle("hidden", x !== t));
+  if (t === "dash") renderAdminDash();
+  if (t === "qr") renderPieces();
+  if (t === "cfg") renderCampForm($("#f-camp-edit"), S.current);
+}
+$$(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+
+function renderAdminDash() {
+  const root = $("#tab-dash");
+  if (!S.pieces.length) { root.innerHTML = `<div class="card empty">Crie o primeiro QR Code na aba <b>QR Codes</b> para começar a medir.</div>`; return; }
+  dashSkeleton(root, { admin: true, pieces: S.pieces, start: S.current.start_date, end: S.current.end_date });
+  const run = async () => {
+    const f = readFilters(root);
+    $("[data-out]", root).innerHTML = `<div class="card empty">Carregando…</div>`;
+    const { data, error } = await sb.rpc("campaign_stats", { p_campaign: S.current.id, p_from: f.from, p_to: f.to, p_piece: f.piece, p_bucket: f.bucket });
+    if (error) return toast(error.message);
+    renderStats(root, data, f.bucket, "ad-");
+  };
+  $("[data-act=apply]", root).onclick = run;
+  $("[data-act=csv]", root).onclick = async () => {
+    const f = readFilters(root);
+    const { data, error } = await sb.rpc("export_scans", { p_campaign: S.current.id, p_from: f.from, p_to: f.to, p_piece: f.piece });
+    if (error) return toast(error.message);
+    if (!data.length) return toast("Sem scans para exportar");
+    const cols = Object.keys(data[0]);
+    const csv = [cols.join(";"), ...data.map(r => cols.map(k => `"${String(r[k] ?? "").replace(/"/g, '""')}"`).join(";"))].join("\n");
+    download(`scans_${S.current.name.replace(/\W+/g, "_")}.csv`, new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  };
+  run();
+}
+
+// ---------- Campanha: criar / editar ----------
+function renderCampForm(form, c) {
+  const isNew = !c?.id;
+  form.innerHTML = `
+    <div class="field"><label>Nome da campanha *</label><input name="name" required value="${esc(c?.name)}" placeholder="Ex.: Black Friday Magalu – CTV Nov/26"></div>
+    <div class="row">
+      <div class="field"><label>Anunciante</label><input name="advertiser" value="${esc(c?.advertiser)}"></div>
+      <div class="field"><label>Agência</label><input name="agency" value="${esc(c?.agency)}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Início</label><input type="date" name="start_date" value="${esc(c?.start_date)}"></div>
+      <div class="field"><label>Fim</label><input type="date" name="end_date" value="${esc(c?.end_date)}"></div>
+    </div>
+    <div class="field"><label>Observações</label><textarea name="notes" rows="2">${esc(c?.notes)}</textarea></div>
+    ${isNew ? "" : `
+    <div class="card" style="background:var(--soft);box-shadow:none;margin-bottom:14px">
+      <label class="check"><input type="checkbox" name="share_enabled" ${c.share_enabled ? "checked" : ""}> Link do cliente ativo</label>
+      <p class="hint mono" style="word-break:break-all">${esc(shareLink(c))}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button type="button" class="sm" data-a="copy">Copiar link</button>
+        <button type="button" class="sm" data-a="regen">Gerar novo link (invalida o atual)</button>
+      </div>
+      <label class="check" style="margin-top:12px"><input type="checkbox" name="archived" ${c.archived ? "checked" : ""}> Arquivar campanha</label>
+    </div>`}
+    <div style="display:flex;gap:8px;justify-content:space-between">
+      <button class="primary">${isNew ? "Criar campanha" : "Salvar alterações"}</button>
+      ${isNew ? "" : `<button type="button" class="ghost danger" data-a="del">Excluir campanha</button>`}
+    </div>`;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const row = { name: fd.get("name"), advertiser: fd.get("advertiser") || null, agency: fd.get("agency") || null,
+      start_date: fd.get("start_date") || null, end_date: fd.get("end_date") || null, notes: fd.get("notes") || null };
+    if (!isNew) { row.share_enabled = !!fd.get("share_enabled"); row.archived = !!fd.get("archived"); }
+    const q = isNew ? sb.from("campaigns").insert(row).select().single() : sb.from("campaigns").update(row).eq("id", c.id).select().single();
+    const { data, error } = await q;
+    if (error) return toast(error.message);
+    closeModal(); await loadCampaigns(); selectCampaign(data.id);
+    toast(isNew ? "Campanha criada" : "Campanha salva");
+  };
+  if (!isNew) {
+    $("[data-a=copy]", form).onclick = () => copy(shareLink(c), "Link do cliente copiado");
+    $("[data-a=regen]", form).onclick = async () => {
+      if (!confirm("O link atual deixará de funcionar. Continuar?")) return;
+      const { data, error } = await sb.from("campaigns").update({ share_token: crypto.randomUUID() }).eq("id", c.id).select().single();
+      if (error) return toast(error.message);
+      await loadCampaigns(); S.current = data; renderCampForm(form, data); toast("Novo link gerado");
+    };
+    $("[data-a=del]", form).onclick = async () => {
+      if (prompt(`Isto apaga a campanha, os QR Codes e TODOS os scans. Digite EXCLUIR para confirmar.`) !== "EXCLUIR") return;
+      const { error } = await sb.from("campaigns").delete().eq("id", c.id);
+      if (error) return toast(error.message);
+      S.current = null; await loadCampaigns();
+      $("#camp-view").classList.add("hidden"); $("#no-camp").classList.remove("hidden"); toast("Campanha excluída");
+    };
+  }
+}
+const shareLink = (c) => location.origin + location.pathname + "?r=" + c.share_token;
+$("#b-copyshare").onclick = () => {
+  if (!S.current.share_enabled) return toast("Ative o link do cliente na aba Campanha");
+  copy(shareLink(S.current), "Link do cliente copiado");
+};
+$("#b-newcamp").onclick = () => {
+  openModal(`<h2 style="margin-bottom:14px">Nova campanha</h2><form id="f-camp-new"></form>`);
+  renderCampForm($("#f-camp-new"), null);
+};
+
+// ---------- Peças / QR Codes ----------
+async function loadPieces() {
+  const { data, error } = await sb.from("pieces").select("*").eq("campaign_id", S.current.id).order("created_at");
+  if (error) return toast(error.message);
+  S.pieces = data;
+}
+function renderPieces() {
+  const root = $("#pieces");
+  if (!S.pieces.length) { root.innerHTML = `<div class="card empty" style="grid-column:1/-1">Nenhum QR Code nesta campanha.</div>`; return; }
+  root.innerHTML = S.pieces.map(p => `
+    <div class="card piece" data-id="${p.id}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
+        <h2>${esc(p.name)}</h2><span class="tag ${p.active ? "on" : ""}">${p.active ? "ativo" : "pausado"}</span>
+      </div>
+      <div class="qr" data-qr></div>
+      <div class="url mono">${esc(qrUrl(p.slug))}</div>
+      <div class="url" style="margin-top:4px">→ ${esc(p.destination)}</div>
+      <div class="acts">
+        <button class="sm" data-a="png">PNG</button><button class="sm" data-a="svg">SVG</button>
+        <button class="sm" data-a="copy">Copiar link</button><button class="sm" data-a="test">Testar</button>
+        <button class="sm" data-a="edit">Editar</button>
+      </div>
+    </div>`).join("");
+  S.pieces.forEach(p => {
+    const el = $(`.piece[data-id="${p.id}"]`);
+    makeQR(qrUrl(p.slug), p.qr_style, 220).append($("[data-qr]", el));
+    const big = () => makeQR(qrUrl(p.slug), p.qr_style, 1200);
+    const fname = `QR_${S.current.name}_${p.name}`.replace(/[^\w-]+/g, "_");
+    $("[data-a=png]", el).onclick = () => big().download({ name: fname, extension: "png" });
+    $("[data-a=svg]", el).onclick = () => { const q = makeQR(qrUrl(p.slug), p.qr_style, 1200); q.update({ type: "svg" }); q.download({ name: fname, extension: "svg" }); };
+    $("[data-a=copy]", el).onclick = () => copy(qrUrl(p.slug));
+    $("[data-a=test]", el).onclick = () => window.open(qrUrl(p.slug), "_blank");
+    $("[data-a=edit]", el).onclick = () => pieceModal(p);
+  });
+}
+$("#b-newpiece").onclick = () => pieceModal(null);
+
+function pieceModal(p) {
+  const isNew = !p, st = p?.qr_style || {};
+  const campSlug = (S.current.name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);
+  openModal(`
+    <h2 style="margin-bottom:14px">${isNew ? "Novo QR Code" : "Editar QR Code"}</h2>
+    <form id="f-piece"><div class="modal-grid"><div>
+      <div class="field"><label>Nome da peça *</label><input name="name" required value="${esc(p?.name)}" placeholder="Ex.: VT 30s – Samsung TV Plus"></div>
+      <div class="field"><label>URL de destino *</label><input name="destination" type="url" required value="${esc(p?.destination)}" placeholder="https://anunciante.com.br/oferta"></div>
+      <div class="row">
+        <div class="field"><label>Código curto (slug)</label><input name="slug" class="mono" value="${esc(p?.slug || slugGen())}" pattern="[A-Za-z0-9_-]{3,40}" ${isNew ? "" : "readonly"}>
+          <div class="hint">${isNew ? "Fica no QR. Curto = QR menos denso." : "Não muda depois de criado (o QR impresso depende dele)."}</div></div>
+        <div class="field"><label>Impressões entregues</label><input name="impressions" type="number" min="0" value="${esc(p?.impressions)}"><div class="hint">Opcional, para taxa de scan.</div></div>
+      </div>
+      <label class="check" style="margin-bottom:10px"><input type="checkbox" name="add_utms" ${p?.add_utms ?? true ? "checked" : ""}> Adicionar UTMs ao destino</label>
+      <div class="row">
+        <div class="field"><label>utm_source</label><input name="utm_source" value="${esc(p?.utm_source ?? "sbt_ctv")}"></div>
+        <div class="field"><label>utm_medium</label><input name="utm_medium" value="${esc(p?.utm_medium ?? "qrcode")}"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>utm_campaign</label><input name="utm_campaign" value="${esc(p?.utm_campaign ?? campSlug)}"></div>
+        <div class="field"><label>utm_content</label><input name="utm_content" value="${esc(p?.utm_content)}" placeholder="vt30_samsung"></div>
+      </div>
+      <h3 style="margin:8px 0 10px">Visual do QR</h3>
+      <div class="row">
+        <div class="field"><label>Cor</label><input name="fg" type="color" value="${esc(st.fg || "#000000")}"></div>
+        <div class="field"><label>Fundo</label><input name="bg" type="color" value="${esc(st.bg || "#ffffff")}"></div>
+        <div class="field"><label>Cantos</label><input name="corner" type="color" value="${esc(st.corner || st.fg || "#000000")}"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Módulos</label><select name="dots">
+          ${[["square","Quadrado (mais legível)"],["rounded","Arredondado"],["dots","Pontos"],["classy-rounded","Classy"]].map(([v,l]) => `<option value="${v}" ${st.dots === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label>Logo central</label><input name="logo" type="file" accept="image/png,image/jpeg,image/svg+xml"></div>
+      </div>
+      ${st.logo ? `<label class="check" style="margin-bottom:10px"><input type="checkbox" name="rmlogo"> Remover logo atual</label>` : ""}
+      <label class="check" style="margin-bottom:12px"><input type="checkbox" name="active" ${p?.active ?? true ? "checked" : ""}> QR ativo (pausado redireciona para o site do SBT)</label>
+    </div>
+    <div>
+      <div class="preview" id="pv"></div>
+      <p class="hint" id="pv-warn"></p>
+      <p class="hint">Para CTV: QR com pelo menos ~15% da altura da tela, alto contraste e margem branca. Evite logo grande em peças curtas.</p>
+    </div></div>
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:8px">
+      <div style="display:flex;gap:8px"><button class="primary">${isNew ? "Criar QR Code" : "Salvar"}</button><button type="button" data-a="cancel">Cancelar</button></div>
+      ${isNew ? "" : `<button type="button" class="ghost danger" data-a="del">Excluir</button>`}
+    </div></form>`);
+  const form = $("#f-piece");
+  let logo = st.logo || null;
+  const curStyle = () => { const fd = new FormData(form); return { fg: fd.get("fg"), bg: fd.get("bg"), corner: fd.get("corner"), dots: fd.get("dots"), logo: fd.get("rmlogo") ? null : logo }; };
+  const preview = () => {
+    const s = curStyle(); $("#pv").innerHTML = ""; makeQR(qrUrl(form.slug.value || "xxxxxx"), s, 220).append($("#pv"));
+    const cr = contrastRatio(s.fg, s.bg);
+    $("#pv-warn").innerHTML = cr < 4 ? `<b style="color:var(--warn)">Contraste baixo (${cr.toFixed(1)}:1).</b> Câmeras podem falhar na leitura da TV.` : (contrastRatio(s.bg, "#000000") < contrastRatio(s.fg, "#000000") ? `<b style="color:var(--warn)">QR invertido</b> (claro sobre escuro): alguns leitores não reconhecem.` : "");
+  };
+  form.oninput = preview;
+  form.logo.onchange = () => {
+    const f = form.logo.files[0]; if (!f) return;
+    if (f.size > 300e3) { toast("Logo acima de 300 KB — use uma versão menor"); form.logo.value = ""; return; }
+    const r = new FileReader(); r.onload = () => { logo = r.result; preview(); }; r.readAsDataURL(f);
+  };
+  preview();
+  $("[data-a=cancel]", form).onclick = closeModal;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const row = {
+      campaign_id: S.current.id, name: fd.get("name"), destination: fd.get("destination"),
+      impressions: fd.get("impressions") ? Number(fd.get("impressions")) : null,
+      add_utms: !!fd.get("add_utms"), utm_source: fd.get("utm_source") || null, utm_medium: fd.get("utm_medium") || null,
+      utm_campaign: fd.get("utm_campaign") || null, utm_content: fd.get("utm_content") || null,
+      active: !!fd.get("active"), qr_style: curStyle()
+    };
+    if (isNew) row.slug = fd.get("slug").trim();
+    const q = isNew ? sb.from("pieces").insert(row) : sb.from("pieces").update(row).eq("id", p.id);
+    const { error } = await q;
+    if (error) return toast(error.code === "23505" ? "Esse código curto já existe, escolha outro" : error.message);
+    closeModal(); await loadPieces(); renderPieces(); toast(isNew ? "QR Code criado" : "QR Code salvo");
+  };
+  if (!isNew) $("[data-a=del]", form).onclick = async () => {
+    if (!confirm(`Excluir "${p.name}" e todos os scans dele? O QR já veiculado passará a cair no site do SBT.`)) return;
+    const { error } = await sb.from("pieces").delete().eq("id", p.id);
+    if (error) return toast(error.message);
+    closeModal(); await loadPieces(); renderPieces(); toast("QR Code excluído");
+  };
+}
+
+// ---------- Modal ----------
+function openModal(html) {
+  $("#modal-root").innerHTML = `<div class="modal"><div class="card">${html}</div></div>`;
+  $(".modal").onclick = (e) => { if (e.target.classList.contains("modal")) closeModal(); };
+}
+function closeModal() { $("#modal-root").innerHTML = ""; }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+$("#b-logout").onclick = async () => { await sb.auth.signOut(); location.href = location.pathname; };
+
+// =====================================================================
+// Início
+// =====================================================================
+(function boot() {
+  if (CONFIG.SUPABASE_URL.includes("SEU-PROJETO")) {
+    document.body.innerHTML = `<div class="login"><div class="card"><h1>Configure o Supabase</h1><p class="muted">Edite o bloco <span class="mono">CONFIG</span> no topo do index.html com a URL do projeto e a chave publishable (anon).</p></div></div>`;
+    return;
+  }
+  const token = new URLSearchParams(location.search).get("r");
+  if (token) return initReport(token);
+  sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" && !S.user) initApp(); });
+  initApp();
+})();
+</script>
+</body>
+</html>
