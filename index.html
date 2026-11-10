@@ -599,7 +599,9 @@ function renderPieces() {
       </div>
       <div class="qr" data-qr></div>
       <div class="url mono">${esc(qrUrl(p.slug))}</div>
-      <div class="url" style="margin-top:4px">→ ${esc(p.destination)}</div>
+      <div class="url" style="margin-top:4px">${p.destination_ios || p.destination_android ? "Outros → " : "→ "}${esc(p.destination)}</div>
+      ${p.destination_ios ? `<div class="url">iPhone → ${esc(p.destination_ios)}</div>` : ""}
+      ${p.destination_android ? `<div class="url">Android → ${esc(p.destination_android)}</div>` : ""}
       <div class="acts">
         <button class="sm" data-a="png">PNG</button><button class="sm" data-a="svg">SVG</button>
         <button class="sm" data-a="copy">Copiar link</button><button class="sm" data-a="test">Testar</button>
@@ -627,7 +629,13 @@ function pieceModal(p) {
     <h2 style="margin-bottom:14px">${isNew ? "Novo QR Code" : "Editar QR Code"}</h2>
     <form id="f-piece"><div class="modal-grid"><div>
       <div class="field"><label>Nome da peça *</label><input name="name" required value="${esc(p?.name)}" placeholder="Ex.: VT 30s – Samsung TV Plus"></div>
-      <div class="field"><label>URL de destino *</label><input name="destination" type="url" required value="${esc(p?.destination)}" placeholder="https://anunciante.com.br/oferta"></div>
+      <div class="field"><label>URL de destino padrão *</label><input name="destination" type="url" required value="${esc(p?.destination)}" placeholder="https://anunciante.com.br/oferta">
+        <div class="hint">Usado por quem não cair nos campos abaixo (desktop, TV, outros sistemas) e por iPhone/Android quando o campo deles estiver vazio.</div></div>
+      <div class="row">
+        <div class="field"><label>Destino iPhone (opcional)</label><input name="destination_ios" type="url" value="${esc(p?.destination_ios)}" placeholder="https://apps.apple.com/br/app/..."></div>
+        <div class="field"><label>Destino Android (opcional)</label><input name="destination_android" type="url" value="${esc(p?.destination_android)}" placeholder="https://play.google.com/store/apps/details?id=..."></div>
+      </div>
+      <p class="hint" style="margin:-4px 0 12px">Links da App Store e do Google Play recebem o rastreio no formato de cada loja (ct na Apple, referrer no Google).</p>
       <div class="row">
         <div class="field"><label>Código curto (slug)</label><input name="slug" class="mono" value="${esc(p?.slug || slugGen())}" pattern="[A-Za-z0-9_-]{3,40}" ${isNew ? "" : "readonly"}>
           <div class="hint">${isNew ? "Fica no QR. Curto = QR menos denso." : "Não muda depois de criado (o QR impresso depende dele)."}</div></div>
@@ -686,6 +694,7 @@ function pieceModal(p) {
     const fd = new FormData(form);
     const row = {
       campaign_id: S.current.id, name: fd.get("name"), destination: fd.get("destination"),
+      destination_ios: fd.get("destination_ios")?.trim() || null, destination_android: fd.get("destination_android")?.trim() || null,
       impressions: fd.get("impressions") ? Number(fd.get("impressions")) : null,
       add_utms: !!fd.get("add_utms"), utm_source: fd.get("utm_source") || null, utm_medium: fd.get("utm_medium") || null,
       utm_campaign: fd.get("utm_campaign") || null, utm_content: fd.get("utm_content") || null,
