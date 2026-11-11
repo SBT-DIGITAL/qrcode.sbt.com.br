@@ -164,6 +164,9 @@ td.n,th.n{text-align:right}
 .tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--card);font-size:12px;padding:6px 9px;border-radius:6px;z-index:40;white-space:nowrap;transform:translate(-50%,-115%)}
 
 .foot{font-size:12px;color:var(--muted);margin:6px 2px 0}
+.pending{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;margin-bottom:16px;border-radius:var(--r);
+  background:color-mix(in srgb,var(--warn) 10%,var(--card));border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));font-size:13.5px}
+.pending b{font-weight:650}
 .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--crit);color:#fff;font-size:11px;font-weight:700}
 .empty{padding:48px 20px;text-align:center;color:var(--ink2)}
 
@@ -253,6 +256,7 @@ const LOGO = "data:image/webp;base64,UklGRkAMAABXRUJQVlA4WAoAAAAQAAAAXwAAXwAAQUx
       <div id="camp-list"></div>
     </aside>
     <main class="main">
+      <div id="pending-banner" class="pending hidden"></div>
       <div id="no-camp" class="card empty">Crie ou selecione uma campanha para começar.</div>
       <div id="camp-view" class="hidden">
         <div class="pagehead">
@@ -719,6 +723,10 @@ async function initApp() {
 async function refreshPendingBadge() {
   const { count } = await sb.from("team_members").select("email", { count: "exact", head: true }).eq("status", "pendente");
   $("#b-users").innerHTML = `Usuários${count ? ` <span class="badge">${count}</span>` : ""}`;
+  const bn = $("#pending-banner");
+  bn.classList.toggle("hidden", !count);
+  if (count) bn.innerHTML = `<span><b>${count} ${count > 1 ? "pedidos de acesso aguardam" : "pedido de acesso aguarda"} sua aprovação.</b> Só depois de aprovado a pessoa consegue criar QR Codes.</span><button class="primary sm" id="b-review">Revisar agora</button>`;
+  if (count) $("#b-review").onclick = usersModal;
 }
 async function usersModal() {
   openModal(`<div class="chead"><div><h2>Usuários</h2><div class="sub">Quem pode entrar no QR CTV. Cada pessoa vê só as campanhas que criou; administradores veem tudo.</div></div>
