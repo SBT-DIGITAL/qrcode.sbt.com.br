@@ -118,9 +118,17 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "sb_publishable_WAeQG0hz7mspDGju0VfDaQ_QyJA4Odm",
   // Base do link que vai dentro do QR. Padrão: a Edge Function "r".
   // Se criar um domínio curto (ex.: https://qr.sbt.com.br/), troque aqui.
-  REDIRECT_BASE: null
+  REDIRECT_BASE: null,
+  // Domínio curto dos QRs. Só é usado quando o painel é aberto por ele,
+  // ou seja, depois que o DNS estiver apontado para o GitHub Pages.
+  CUSTOM_DOMAIN: "qrcode.sbt.com.br"
 };
-CONFIG.REDIRECT_BASE = CONFIG.REDIRECT_BASE || (CONFIG.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/r/");
+// QRs usam o próprio endereço do painel (domínio próprio ou github.io), onde o 404.html
+// encaminha /<código> para a função de redirect. Fora disso, usa o link direto do Supabase.
+CONFIG.REDIRECT_BASE = CONFIG.REDIRECT_BASE ||
+  (location.hostname === CONFIG.CUSTOM_DOMAIN || location.hostname.endsWith(".github.io")
+    ? location.origin + location.pathname.replace(/[^/]*$/, "")
+    : CONFIG.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/r/");
 </script>
 
 <!-- ============ LOGIN ============ -->

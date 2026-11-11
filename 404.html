@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Redirecionando…</title>
+<script>
+// Encaminha qrcode.sbt.com.br/<slug> para a função de redirect do Supabase,
+// que registra o scan e leva ao destino final.
+(function () {
+  var FN = "https://kdpyxuvsjtixrbhqfbhu.supabase.co/functions/v1/r/";
+  var FALLBACK = "https://www.sbt.com.br";
+  var parts = location.pathname.split("/").filter(Boolean);
+  var slug = parts.length ? decodeURIComponent(parts[parts.length - 1]) : "";
+  if (/^[A-Za-z0-9_-]{3,40}$/.test(slug)) {
+    location.replace(FN + encodeURIComponent(slug) + location.search);
+  } else {
+    location.replace(FALLBACK);
+  }
+})();
+</script>
+<style>
+  :root { --bg:#ffffff; --ink:#5e6573; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1015; --ink:#98a0ae; } }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font:15px/1.4 system-ui, sans-serif; display:grid; place-items:center; }
+</style>
+</head>
+<body>
+  <p>Redirecionando…</p>
+  <noscript><p><a href="https://www.sbt.com.br">Continuar</a></p></noscript>
+</body>
+</html>
