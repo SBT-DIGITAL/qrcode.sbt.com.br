@@ -681,15 +681,17 @@ async function initApp() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return showLogin();
   S.user = session.user;
-  const { data: me } = await sb.from("team_members").select("email").limit(1);
-  if (!me || !me.length) {
+  const { data: team } = await sb.from("team_members").select("*");
+  const me = (team || []).find(t => t.email.toLowerCase() === S.user.email.toLowerCase());
+  S.isAdmin = !!me?.is_admin;
+  if (!me) {
     show("v-login");
     $("#l-msg").innerHTML = `O e-mail <b>${esc(S.user.email)}</b> ainda não foi liberado. Peça para incluírem em <span class="mono">team_members</span>. <a href="#" id="l-out">Sair</a>`;
     $("#l-out").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
     return;
   }
   show("v-app");
-  $("#who").textContent = S.user.email;
+  $("#who").textContent = S.user.email + (S.isAdmin ? " · admin" : "");
   await loadCampaigns();
   const last = lsGet("qrctv:camp");
   if (last && S.campaigns.find(c => c.id === last)) selectCampaign(last);
@@ -726,6 +728,7 @@ function renderCampList() {
   $("#camp-list").innerHTML = list.length ? list.map(c => `
     <div class="camp ${S.current?.id === c.id ? "sel" : ""}" data-id="${c.id}">
       <b>${esc(c.name)}</b><small>${esc(c.advertiser || "—")}${c.start_date ? " · " + fmtDate(c.start_date) : ""}${c.archived ? " · arquivada" : ""}</small>
+      ${S.isAdmin && (c.created_by || "").toLowerCase() !== S.user.email.toLowerCase() ? `<small style="display:block">por ${esc((c.created_by || "sem dono").split("@")[0])}</small>` : ""}
     </div>`).join("") : `<p class="sub">Nenhuma campanha.</p>`;
   $$(".camp").forEach(el => el.onclick = () => selectCampaign(el.dataset.id));
 }
