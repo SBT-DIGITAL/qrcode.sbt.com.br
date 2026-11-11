@@ -219,14 +219,15 @@ const LOGO = "data:image/webp;base64,UklGRkAMAABXRUJQVlA4WAoAAAAQAAAAXwAAXwAAQUx
   <div class="login">
     <div class="brand" style="margin-bottom:22px"><img data-logo alt="SBT"><span class="sep"></span><span><b>QR CTV</b><small>SBT Digital</small></span></div>
     <div class="card">
-      <h1 style="margin-bottom:6px">Entrar</h1>
-      <p class="muted" style="margin:0 0 16px">Acesso restrito ao time Digital.</p>
+      <h1 style="margin-bottom:6px" id="l-title">Entrar</h1>
+      <p class="muted" style="margin:0 0 16px" id="l-desc">Acesso restrito ao time Digital.</p>
       <form id="f-login">
         <div class="field"><label>E-mail</label><input type="email" id="l-email" required autocomplete="email"></div>
-        <div class="field"><label>Senha</label><input type="password" id="l-pass" autocomplete="current-password"></div>
-        <button class="primary" style="width:100%;justify-content:center">Entrar</button>
+        <div class="field"><label>Senha</label><input type="password" id="l-pass" required minlength="8" autocomplete="current-password"></div>
+        <div class="field hidden" id="l-pass2-wrap"><label>Confirme a senha</label><input type="password" id="l-pass2" minlength="8" autocomplete="new-password"></div>
+        <button class="primary" id="l-btn" style="width:100%;justify-content:center">Entrar</button>
       </form>
-      <p class="hint"><a href="#" id="l-magic">Receber link de acesso por e-mail</a></p>
+      <p class="hint"><a href="#" id="l-toggle">Primeiro acesso? Criar minha senha</a></p>
       <p id="l-msg" class="hint"></p>
     </div>
   </div>
@@ -697,23 +698,57 @@ async function initApp() {
   if (last && S.campaigns.find(c => c.id === last)) selectCampaign(last);
 }
 
+// Login por senha. "Primeiro acesso" cria a conta na hora, sem e-mail de confirmação
+// (requer "Confirm email" desligado no Supabase). O acesso aos dados continua
+// dependendo do e-mail estar liberado em team_members.
 function showLogin() {
   show("v-login");
+  let signup = false;
+  const msg = (t) => $("#l-msg").textContent = t;
+  const setMode = (on) => {
+    signup = on;
+    $("#l-title").textContent = on ? "Criar minha senha" : "Entrar";
+    $("#l-desc").textContent = on ? "Use o e-mail do SBT que foi liberado no QR CTV. Mínimo de 8 caracteres." : "Acesso restrito ao time Digital.";
+    $("#l-pass2-wrap").classList.toggle("hidden", !on);
+    $("#l-pass2").required = on;
+    $("#l-pass").autocomplete = on ? "new-password" : "current-password";
+    $("#l-btn").textContent = on ? "Criar senha e entrar" : "Entrar";
+    $("#l-toggle").textContent = on ? "Já tenho senha — entrar" : "Primeiro acesso? Criar minha senha";
+    msg("");
+  };
+  $("#l-toggle").onclick = (e) => { e.preventDefault(); setMode(!signup); };
+  // Link direto para cadastro: .../?cadastro
+  if (new URLSearchParams(location.search).has("cadastro")) setMode(true);
   $("#f-login").onsubmit = async (e) => {
     e.preventDefault();
-    const email = $("#l-email").value.trim(), password = $("#l-pass").value;
-    if (!password) return $("#l-msg").textContent = "Informe a senha ou use o link de acesso por e-mail.";
-    $("#l-msg").textContent = "Entrando…";
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) return $("#l-msg").textContent = "E-mail ou senha incorretos.";
-    $("#l-msg").textContent = ""; initApp();
-  };
-  $("#l-magic").onclick = async (e) => {
-    e.preventDefault();
-    const email = $("#l-email").value.trim();
-    if (!email) return $("#l-msg").textContent = "Digite o e-mail primeiro.";
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-    $("#l-msg").textContent = error ? error.message : "Enviamos um link de acesso para o seu e-mail.";
+    const email = $("#l-email").value.trim().toLowerCase(), password = $("#l-pass").value;
+    if (!signup) {
+      msg("Entrando…");
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) return msg(/confirm/i.test(error.message) ? "Conta ainda não confirmada. Peça ao administrador para confirmar seu usuário no Supabase." : "E-mail ou senha incorretos.");
+      msg(""); return initApp();
+    }
+    if (password !== $("#l-pass2").value) return msg("As senhas não conferem.");
+    msg("Criando acesso…");
+    // 1º caminho: função "signup" (cria a conta já confirmada, sem e-mail)
+    try {
+      const r = await fetch(CONFIG.SUPABASE_URL + "/functions/v1/signup", {
+        method: "POST", headers: { "Content-Type": "application/json", apikey: CONFIG.SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email, password })
+      });
+      if (r.status !== 404) {
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) return msg(j.error || j.message || "Não foi possível criar o acesso.");
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) return msg("Acesso criado. Entre com e-mail e senha.");
+        msg(""); return initApp();
+      }
+    } catch { /* função indisponível: tenta o cadastro padrão abaixo */ }
+    // 2º caminho: cadastro padrão do Supabase (exige "Confirm email" desligado)
+    const { data, error } = await sb.auth.signUp({ email, password });
+    if (error) return msg(/registered|exists/i.test(error.message) ? "Este e-mail já tem senha. Use \"Já tenho senha — entrar\"." : /rate|limit/i.test(error.message) ? "O Supabase ainda está pedindo confirmação por e-mail. Avise o administrador para desligar \"Confirm email\"." : error.message);
+    if (!data.session) return msg("Conta criada, mas o Supabase exige confirmação por e-mail. Avise o administrador para desligar \"Confirm email\".");
+    msg(""); initApp();
   };
 }
 
