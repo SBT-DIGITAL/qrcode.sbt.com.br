@@ -164,6 +164,7 @@ td.n,th.n{text-align:right}
 .tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--card);font-size:12px;padding:6px 9px;border-radius:6px;z-index:40;white-space:nowrap;transform:translate(-50%,-115%)}
 
 .foot{font-size:12px;color:var(--muted);margin:6px 2px 0}
+.badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--crit);color:#fff;font-size:11px;font-weight:700}
 .empty{padding:48px 20px;text-align:center;color:var(--ink2)}
 
 /* ---------- QR ---------- */
@@ -222,6 +223,7 @@ const LOGO = "data:image/webp;base64,UklGRkAMAABXRUJQVlA4WAoAAAAQAAAAXwAAXwAAQUx
       <h1 style="margin-bottom:6px" id="l-title">Entrar</h1>
       <p class="muted" style="margin:0 0 16px" id="l-desc">Acesso restrito ao time Digital.</p>
       <form id="f-login">
+        <div class="field hidden" id="l-name-wrap"><label>Nome</label><input id="l-name" autocomplete="name" placeholder="Seu nome"></div>
         <div class="field"><label>E-mail</label><input type="email" id="l-email" required autocomplete="email"></div>
         <div class="field"><label>Senha</label><input type="password" id="l-pass" required minlength="8" autocomplete="current-password"></div>
         <div class="field hidden" id="l-pass2-wrap"><label>Confirme a senha</label><input type="password" id="l-pass2" minlength="8" autocomplete="new-password"></div>
@@ -239,6 +241,7 @@ const LOGO = "data:image/webp;base64,UklGRkAMAABXRUJQVlA4WAoAAAAQAAAAXwAAXwAAQUx
     <a class="brand" href="./"><img data-logo alt="SBT"><span class="sep"></span><span><b>QR CTV</b><small>Métricas de QR Code · SBT Digital</small></span></a>
     <div class="sp"></div>
     <span id="who" class="muted" style="font-size:12.5px"></span>
+    <button class="sm hidden" id="b-users">Usuários</button>
     <button class="ghost sm" id="b-logout">Sair</button>
   </header>
   <div class="shell">
@@ -682,25 +685,97 @@ async function initApp() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return showLogin();
   S.user = session.user;
-  const { data: team } = await sb.from("team_members").select("*");
-  const me = (team || []).find(t => t.email.toLowerCase() === S.user.email.toLowerCase());
-  S.isAdmin = !!me?.is_admin;
-  if (!me) {
+  // Qual é o meu acesso? (my_access funciona até para quem está pendente)
+  let acc = null;
+  const ra = await sb.rpc("my_access");
+  if (!ra.error) acc = ra.data;
+  else {
+    const { data: team } = await sb.from("team_members").select("*");
+    const me = (team || []).find(t => t.email.toLowerCase() === S.user.email.toLowerCase());
+    acc = me ? { status: me.status || "ativo", is_admin: !!me.is_admin } : null;
+  }
+  S.isAdmin = !!acc?.is_admin && acc.status === "ativo";
+  if (!acc || acc.status !== "ativo") {
     show("v-login");
-    $("#l-msg").innerHTML = `O e-mail <b>${esc(S.user.email)}</b> ainda não foi liberado. Peça para incluírem em <span class="mono">team_members</span>. <a href="#" id="l-out">Sair</a>`;
-    $("#l-out").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+    $("#f-login").classList.add("hidden"); $("#l-toggle").parentElement.classList.add("hidden");
+    $("#l-title").textContent = acc ? "Cadastro em análise" : "Acesso não liberado";
+    $("#l-desc").innerHTML = acc
+      ? `Seu cadastro (<b>${esc(S.user.email)}</b>) foi recebido e está aguardando a aprovação de um administrador. Assim que for aprovado, é só entrar de novo.`
+      : `O e-mail <b>${esc(S.user.email)}</b> não tem acesso ao QR CTV. Fale com o administrador.`;
+    $("#l-msg").innerHTML = `<a href="#" id="l-out">Sair</a>`;
+    $("#l-out").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.href = location.pathname; };
     return;
   }
   show("v-app");
   $("#who").textContent = S.user.email + (S.isAdmin ? " · admin" : "");
+  $("#b-users").classList.toggle("hidden", !S.isAdmin);
+  if (S.isAdmin) refreshPendingBadge();
   await loadCampaigns();
   const last = lsGet("qrctv:camp");
   if (last && S.campaigns.find(c => c.id === last)) selectCampaign(last);
 }
 
-// Login por senha. "Primeiro acesso" cria a conta na hora, sem e-mail de confirmação
-// (requer "Confirm email" desligado no Supabase). O acesso aos dados continua
-// dependendo do e-mail estar liberado em team_members.
+// ---------- Usuários (só admin) ----------
+async function refreshPendingBadge() {
+  const { count } = await sb.from("team_members").select("email", { count: "exact", head: true }).eq("status", "pendente");
+  $("#b-users").innerHTML = `Usuários${count ? ` <span class="badge">${count}</span>` : ""}`;
+}
+async function usersModal() {
+  openModal(`<div class="chead"><div><h2>Usuários</h2><div class="sub">Quem pode entrar no QR CTV. Cada pessoa vê só as campanhas que criou; administradores veem tudo.</div></div>
+      <button class="ghost sm" data-a="close">Fechar</button></div>
+    <div class="card" style="background:var(--raised);box-shadow:none;margin-bottom:14px">
+      <h3 style="margin-bottom:8px">Link de cadastro para enviar ao time</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="mono" style="word-break:break-all;flex:1 1 260px">${esc(location.origin + location.pathname + "?cadastro")}</span>
+      <button class="sm" data-a="copylink">Copiar link</button></div>
+      <p class="hint">Quem se cadastrar com e-mail @sbt.com.br aparece aqui como pendente até você aprovar.</p>
+    </div>
+    <form id="f-adduser" class="row" style="align-items:flex-end;margin-bottom:14px">
+      <div class="field" style="margin:0;flex:2 1 200px"><label>Liberar e-mail direto</label><input name="email" type="email" required placeholder="fulano@sbt.com.br"></div>
+      <div class="field" style="margin:0"><label>Nome</label><input name="name" placeholder="Opcional"></div>
+      <label class="check" style="flex:0 0 auto;padding-bottom:8px"><input type="checkbox" name="is_admin"> Admin</label>
+      <button class="primary" style="flex:0 0 auto">Liberar</button>
+    </form>
+    <div data-users class="tablewrap"><div class="empty">Carregando…</div></div>`);
+  $("[data-a=close]").onclick = closeModal;
+  $("[data-a=copylink]").onclick = () => copy(location.origin + location.pathname + "?cadastro", "Link de cadastro copiado");
+  const load = async () => {
+    const { data, error } = await sb.from("team_members").select("*").order("status", { ascending: false }).order("email");
+    if (error) return toast(error.message);
+    const me = S.user.email.toLowerCase();
+    $("[data-users]").innerHTML = `<table><thead><tr><th>Pessoa</th><th>Situação</th><th>Admin</th><th class="n">Ações</th></tr></thead><tbody>
+      ${data.map(u => { const self = u.email.toLowerCase() === me, pend = u.status === "pendente";
+        return `<tr data-email="${esc(u.email)}"><td><b style="font-weight:600">${esc(u.name || u.email.split("@")[0])}</b><div class="sub">${esc(u.email)}</div></td>
+        <td>${pend ? `<span class="tag" style="color:var(--warn)">● Aguardando aprovação</span>` : `<span class="tag on">● Ativo</span>`}</td>
+        <td><input type="checkbox" data-a="admin" ${u.is_admin ? "checked" : ""} ${self || pend ? "disabled" : ""} aria-label="Administrador"></td>
+        <td class="n" style="white-space:nowrap">${pend ? `<button class="primary sm" data-a="approve">Aprovar</button> ` : ""}
+          ${self ? `<span class="sub">você</span>` : `<button class="ghost sm danger" data-a="remove">${pend ? "Recusar" : "Remover"}</button>`}</td></tr>`; }).join("")}
+      </tbody></table>`;
+    $$("[data-users] tr[data-email]").forEach(tr => {
+      const email = tr.dataset.email;
+      const upd = async (patch, ok) => { const { error } = await sb.from("team_members").update(patch).eq("email", email); if (error) return toast(error.message); toast(ok); load(); refreshPendingBadge(); };
+      $("[data-a=approve]", tr)?.addEventListener("click", () => upd({ status: "ativo" }, "Acesso aprovado"));
+      $("[data-a=admin]", tr)?.addEventListener("change", (e) => upd({ is_admin: e.target.checked }, e.target.checked ? "Agora é administrador" : "Deixou de ser administrador"));
+      $("[data-a=remove]", tr)?.addEventListener("click", async () => {
+        if (!confirm(`Remover o acesso de ${email}? As campanhas dela continuam salvas e você (admin) segue vendo.`)) return;
+        const { error } = await sb.from("team_members").delete().eq("email", email);
+        if (error) return toast(error.message); toast("Acesso removido"); load(); refreshPendingBadge();
+      });
+    });
+  };
+  $("#f-adduser").onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const row = { email: String(fd.get("email")).trim().toLowerCase(), name: fd.get("name") || null, is_admin: !!fd.get("is_admin"), status: "ativo" };
+    const { error } = await sb.from("team_members").upsert(row, { onConflict: "email" });
+    if (error) return toast(error.message);
+    e.target.reset(); toast("E-mail liberado — envie o link de cadastro"); load(); refreshPendingBadge();
+  };
+  load();
+}
+$("#b-users").onclick = usersModal;
+
+// Login por senha. "Primeiro acesso" cria a conta na hora pela função signup,
+// sem e-mail de confirmação. Quem não foi liberado entra como "pendente".
 function showLogin() {
   show("v-login");
   let signup = false;
@@ -708,8 +783,9 @@ function showLogin() {
   const setMode = (on) => {
     signup = on;
     $("#l-title").textContent = on ? "Criar minha senha" : "Entrar";
-    $("#l-desc").textContent = on ? "Use o e-mail do SBT que foi liberado no QR CTV. Mínimo de 8 caracteres." : "Acesso restrito ao time Digital.";
+    $("#l-desc").textContent = on ? "Use seu e-mail do SBT. Se ainda não foi liberado, o pedido vai para aprovação do administrador." : "Acesso restrito ao time Digital.";
     $("#l-pass2-wrap").classList.toggle("hidden", !on);
+    $("#l-name-wrap").classList.toggle("hidden", !on);
     $("#l-pass2").required = on;
     $("#l-pass").autocomplete = on ? "new-password" : "current-password";
     $("#l-btn").textContent = on ? "Criar senha e entrar" : "Entrar";
@@ -734,7 +810,7 @@ function showLogin() {
     try {
       const r = await fetch(CONFIG.SUPABASE_URL + "/functions/v1/signup", {
         method: "POST", headers: { "Content-Type": "application/json", apikey: CONFIG.SUPABASE_ANON_KEY },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, name: $("#l-name").value.trim() })
       });
       if (r.status !== 404) {
         const j = await r.json().catch(() => ({}));
